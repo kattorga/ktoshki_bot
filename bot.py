@@ -1,9 +1,8 @@
-#python bot.py
 import telebot
 import time
 import os
 
-TOKEN = '8224970362:AAFSU2qoO2MDrKHzwce7ArkZkRK9Rlf3DKg'  
+TOKEN = os.environ.get('TOKEN')
 bot = telebot.TeleBot(TOKEN)
 
 photos_and_captions = [
@@ -56,14 +55,36 @@ photos_and_captions = [
 # Словарь для хранения состояния
 user_states = {}
 
+# ===== ГЛАВНОЕ МЕНЮ =====
+def show_main_menu(chat_id):
+    markup = telebot.types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
+    btn1 = telebot.types.KeyboardButton('🎖️ 23 ФЕВРАЛЯ')
+    btn2 = telebot.types.KeyboardButton('📦 ОП')
+    markup.add(btn1, btn2)
+    
+    bot.send_message(
+        chat_id,
+        "✨ Добро пожаловать! ✨\n\nВыбери, что хочешь посмотреть:",
+        reply_markup=markup
+    )
+
+# ===== СТАРТ =====
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     chat_id = message.chat.id
+    show_main_menu(chat_id)
+
+# ===== КНОПКА "23 ФЕВРАЛЯ" =====
+@bot.message_handler(func=lambda message: message.text == '🎖️ 23 ФЕВРАЛЯ')
+def handle_feb23(message):
+    chat_id = message.chat.id
+    
+    # Сбрасываем счётчик фото
     user_states[chat_id] = 0
     
     bot.send_message(
         chat_id,
-        "С 23 февраля, любимый! \n\n"
+        "С 23 февраля, любимый! 🎖️\n\n"
         "Так как я честно не знала как тебя можно порадовать и немного отвлечь в силу обстоятельств, решила приготовить такой прекольчик🤨.\n\n"
         "Эта идея пришла мне пока я сидела на толчке, мне стало забавно и я решила попробовать.\n\n"
         "В этот день все поздравляют своих мужчин с праздником. Для меня ты - самый важный мужчина!\n\n"
@@ -71,10 +92,35 @@ def send_welcome(message):
     
     send_next_button(chat_id)
 
+# ===== КНОПКА "ОП" =====
+@bot.message_handler(func=lambda message: message.text == '📦 ОП')
+def handle_op(message):
+    chat_id = message.chat.id
+    
+    markup = telebot.types.ReplyKeyboardMarkup(resize_keyboard=True)
+    btn_menu = telebot.types.KeyboardButton('🏠 В ГЛАВНОЕ МЕНЮ')
+    markup.add(btn_menu)
+    
+    bot.send_message(
+        chat_id,
+        "📦 Ожидайте обновлений...\n\n"
+        "Скоро здесь появится что-то интересное! ✨",
+        reply_markup=markup
+    )
+
+# ===== КНОПКА "В ГЛАВНОЕ МЕНЮ" =====
+@bot.message_handler(func=lambda message: message.text == '🏠 В ГЛАВНОЕ МЕНЮ')
+def back_to_menu(message):
+    chat_id = message.chat.id
+    user_states.pop(chat_id, None)  # Очищаем состояние
+    show_main_menu(chat_id)
+
+# ===== ФУНКЦИИ ДЛЯ ЛИСТАНИЯ ФОТО =====
 def send_next_button(chat_id):
     markup = telebot.types.ReplyKeyboardMarkup(resize_keyboard=True)
-    btn = telebot.types.KeyboardButton('➡️ ДАЛЕЕ')
-    markup.add(btn)
+    btn_next = telebot.types.KeyboardButton('➡️ ДАЛЕЕ')
+    btn_menu = telebot.types.KeyboardButton('🏠 В ГЛАВНОЕ МЕНЮ')
+    markup.add(btn_next, btn_menu)
     
     bot.send_message(
         chat_id,
@@ -85,6 +131,12 @@ def send_next_button(chat_id):
 @bot.message_handler(func=lambda message: message.text == '➡️ ДАЛЕЕ')
 def send_next_photo(message):
     chat_id = message.chat.id
+    
+    # Проверяем, есть ли состояние у пользователя
+    if chat_id not in user_states:
+        show_main_menu(chat_id)
+        return
+    
     current_index = user_states.get(chat_id, 0)
     
     if current_index < len(photos_and_captions):
@@ -92,7 +144,6 @@ def send_next_photo(message):
         
         try:
             with open(photo_data['file'], 'rb') as f:
-                # Отправляем с Markdown для курсива
                 bot.send_photo(
                     chat_id, 
                     f, 
@@ -106,8 +157,8 @@ def send_next_photo(message):
                 send_next_button(chat_id)
             else:
                 markup = telebot.types.ReplyKeyboardMarkup(resize_keyboard=True)
-                btn = telebot.types.KeyboardButton('ЕЩЕ РАЗ С НАЧАЛА')
-                markup.add(btn)
+                btn_menu = telebot.types.KeyboardButton('🏠 В ГЛАВНОЕ МЕНЮ')
+                markup.add(btn_menu)
                 
                 bot.send_message(
                     chat_id,
@@ -127,20 +178,14 @@ def send_next_photo(message):
             send_next_button(chat_id)
     else:
         markup = telebot.types.ReplyKeyboardMarkup(resize_keyboard=True)
-        btn = telebot.types.KeyboardButton('ЕЩЕ РАЗ С НАЧАЛА')
-        markup.add(btn)
+        btn_menu = telebot.types.KeyboardButton('🏠 В ГЛАВНОЕ МЕНЮ')
+        markup.add(btn_menu)
         
         bot.send_message(
             chat_id,
-            "Мы уже всё посмотрели! Хочешь повторить?",
+            "Мы уже всё посмотрели! Хочешь посмотреть что-то ещё? Нажми на кнопку внизу",
             reply_markup=markup
         )
-
-@bot.message_handler(func=lambda message: message.text == 'ЕЩЕ РАЗ С НАЧАЛА')
-def restart(message):
-    chat_id = message.chat.id
-    user_states[chat_id] = 0
-    send_next_button(chat_id)
 
 if __name__ == '__main__':
     print("Бот запущен...")
